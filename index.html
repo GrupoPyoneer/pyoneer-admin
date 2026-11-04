@@ -106,6 +106,7 @@ td a{color:var(--blue)}
 <button role="tab" aria-selected="true" data-t="geral">Visão geral</button>
 <button role="tab" aria-selected="false" data-t="cadastros" id="tcad">Cadastros</button>
 <button role="tab" aria-selected="false" data-t="agenda" id="tagd">Agendamentos</button>
+<button role="tab" aria-selected="false" data-t="catalogo" id="tcat">Catálogo</button>
 </div>
 <div class="tools">
 <label for="per" style="font-weight:500">Período</label>
@@ -121,8 +122,9 @@ td a{color:var(--blue)}
 <div class="kpis" id="kpis"></div>
 <div class="grid2">
 <div class="card full"><h3>Sessões por dia</h3><p class="sub">Cada sessão é uma visita a partir de um aparelho, sem cookies.</p><div id="c1"></div></div>
-<div class="card"><h3>Cadastros por dia</h3><p class="sub">Formulário de agendamento e página Contato.</p><div id="c2"></div></div>
+<div class="card"><h3>Cadastros por dia</h3><p class="sub">Formulário de agendamento, página Contato e catálogo.</p><div id="c2"></div></div>
 <div class="card"><h3>Do clique ao agendamento</h3><p class="sub">Quantas sessões chegam em cada etapa.</p><div class="fun" id="fun"></div></div>
+<div class="card full"><h3>Downloads do catálogo por dia</h3><p class="sub" id="c3s">Pessoas que preencheram o formulário e baixaram o catálogo.</p><div id="c3"></div></div>
 <div class="card"><h3>Origem do acesso</h3><p class="sub">De onde vieram as sessões.</p><div class="rows" id="b-ref"></div></div>
 <div class="card"><h3>Campanhas (UTM)</h3><p class="sub">Links com utm_source nos anúncios e posts.</p><div class="rows" id="b-utm"></div></div>
 <div class="card"><h3>Aparelho</h3><p class="sub">Por largura de tela.</p><div class="rows" id="b-dev"></div></div>
@@ -137,11 +139,23 @@ td a{color:var(--blue)}
 <div class="tools">
 <input type="search" id="q" placeholder="Buscar nome, e-mail ou telefone" aria-label="Buscar cadastros" style="min-width:240px">
 <select id="fs" aria-label="Filtrar por status"><option value="">Todos os status</option><option value="novo">Novo</option><option value="contatado">Contatado</option><option value="em_andamento">Em andamento</option><option value="fechado">Fechado</option><option value="descartado">Descartado</option></select>
-<select id="fo" aria-label="Filtrar por origem"><option value="">Todas as origens</option><option value="agendamento">Agendamento</option><option value="contato">Contato</option></select>
+<select id="fo" aria-label="Filtrar por origem"><option value="">Todas as origens</option><option value="agendamento">Agendamento</option><option value="contato">Contato</option><option value="catalogo">Catálogo</option></select>
 <span class="sp"></span>
 <button class="btn line" id="csv">Exportar CSV</button>
 </div>
 <div class="tw"><table><thead><tr><th>Data</th><th>Origem</th><th>Nome</th><th>Contato</th><th>E-mail</th><th>Mensagem</th><th>Status</th></tr></thead><tbody id="lt"></tbody></table></div>
+</div>
+
+<div id="p-catalogo" hidden>
+<div class="kpis" id="ck"></div>
+<div class="tools">
+<input type="search" id="cq" placeholder="Buscar nome, e-mail ou telefone" aria-label="Buscar downloads do catálogo" style="min-width:240px">
+<select id="cs" aria-label="Filtrar por status"><option value="">Todos os status</option><option value="novo">Novo</option><option value="contatado">Contatado</option><option value="em_andamento">Em andamento</option><option value="fechado">Fechado</option><option value="descartado">Descartado</option></select>
+<span class="sp"></span>
+<button class="btn line" id="ccsv">Exportar CSV</button>
+</div>
+<div class="tw"><table><thead><tr><th>Data do download</th><th>Nome</th><th>WhatsApp</th><th>E-mail</th><th>Idioma</th><th>Status</th></tr></thead><tbody id="ct"></tbody></table></div>
+<p class="note">Cada linha é uma pessoa que preencheu nome, telefone e e-mail, aceitou o consentimento e baixou o catálogo de serviços (PDF). Também aparece em Cadastros com a origem "Catálogo".</p>
 </div>
 
 <div id="p-agenda" hidden>
@@ -216,7 +230,7 @@ $('per').addEventListener('change',load);$('rf').addEventListener('click',load);
 /* ---------- abas ---------- */
 var tab='geral',ready=false;
 document.querySelectorAll('.tabs button').forEach(function(b){b.addEventListener('click',function(){tab=b.dataset.t;document.querySelectorAll('.tabs button').forEach(function(x){x.setAttribute('aria-selected',String(x===b))});panes()})});
-function panes(){['geral','cadastros','agenda'].forEach(function(t){show($('p-'+t),ready&&t===tab)})}
+function panes(){['geral','cadastros','agenda','catalogo'].forEach(function(t){show($('p-'+t),ready&&t===tab)})}
 
 /* ---------- gráficos ---------- */
 var tip=$('tip');
@@ -260,6 +274,7 @@ function rows(el,map,total,limit){
  el.innerHTML=a.map(function(r){var pc=total?Math.round(r[1]/total*100):0;return '<div class="row"><span class="nm" title="'+esc(r[0])+'">'+esc(r[0])+'</span><span class="bar2"><i style="width:'+Math.max(2,r[1]/mx*100)+'%"></i></span><span class="v">'+fmtN(r[1])+' <span style="color:var(--muted);font-weight:400">'+pc+'%</span></span></div>'}).join('')}
 
 /* ---------- visão geral ---------- */
+function isCat(l){return l.source==='contato'&&/cat[aá]logo/i.test(l.message||'')}
 function render(){
  var sess={},first={};
  D.visits.slice().reverse().forEach(function(v){sess[v.sid]=1;if(!first[v.sid])first[v.sid]=v});
@@ -267,13 +282,13 @@ function render(){
  var cl={},sb2={},mapB={};
  D.events.forEach(function(e){if(e.type==='click_book')cl[e.sid]=1;if(e.type==='submit_book')sb2[e.sid]=1});
  var nclk=D.events.filter(function(e){return e.type==='click_book'}).length;
- var nl=D.leads.length,nAg=D.leads.filter(function(l){return l.source==='agendamento'}).length,nCt=nl-nAg;
+ var nl=D.leads.length,nAg=D.leads.filter(function(l){return l.source==='agendamento'}).length,nCat=D.leads.filter(isCat).length,nCt=nl-nAg-nCat;
  var bk=D.bookings.filter(function(b){return b.status==='confirmado'}).length;
  var conv=ns?(nl/ns*100):0;
  var newN=D.leads.filter(function(l){return l.status==='novo'}).length;
  $('kpis').innerHTML=
   k(fmtN(ns),'Sessões')+k(fmtN(pv),'Páginas vistas')+k(fmtN(nclk),'Cliques em agendar')+
-  k(fmtN(nl),'Cadastros ('+nAg+' agend. · '+nCt+' contato)')+k(fmtN(bk),'Reuniões confirmadas',1)+k(conv.toFixed(1).replace('.',',')+'%','Cadastros por sessão');
+  k(fmtN(nl),'Cadastros ('+nAg+' agend. · '+nCt+' contato · '+nCat+' catálogo)')+k(fmtN(bk),'Reuniões confirmadas',1)+k(conv.toFixed(1).replace('.',',')+'%','Cadastros por sessão')+k(fmtN(nCat),'Downloads do catálogo');
  function k(n,l,d){return '<div class="kpi'+(d?' dark':'')+'"><div class="n">'+n+'</div><div class="l">'+l+'</div></div>'}
  $('tcad').textContent='Cadastros'+(newN?' ('+newN+' novos)':'');
  $('tagd').textContent='Agendamentos';
@@ -282,11 +297,13 @@ function render(){
  if(+$('per').value===0){var all0=D.visits.concat(D.leads);if(all0.length){start=new Date(all0[all0.length-1].created_at)}}
  for(var t=new Date(dKey(start.toISOString())+'T12:00:00-03:00');t<=end;t=new Date(t.getTime()+864e5)){days.push(dKey(t.toISOString()))}
  days=days.filter(function(d,i,a){return a.indexOf(d)===i});
- var vs={},ls={};days.forEach(function(d){vs[d]={};ls[d]=0});
+ var vs={},ls={},cs={};days.forEach(function(d){vs[d]={};ls[d]=0;cs[d]=0});
  D.visits.forEach(function(v){var d=dKey(v.created_at);if(vs[d])vs[d][v.sid]=1});
- D.leads.forEach(function(l){var d=dKey(l.created_at);if(ls[d]!=null)ls[d]++});
+ D.leads.forEach(function(l){var d=dKey(l.created_at);if(ls[d]!=null){ls[d]++;if(isCat(l))cs[d]++}});
  chart($('c1'),days.map(function(d){return{x:d,y:Object.keys(vs[d]).length}}),'#2a78d6','line','sessões');
  chart($('c2'),days.map(function(d){return{x:d,y:ls[d]}}),'#eb6834','bar','cadastros');
+ chart($('c3'),days.map(function(d){return{x:d,y:cs[d]}}),'#1baf7a','bar','downloads');
+ $('c3s').textContent=nCat+' download'+(nCat===1?'':'s')+' no período ('+(ns?(nCat/ns*100).toFixed(1).replace('.',','):'0')+'% das sessões).';
  /* funil */
  var steps=[['Sessões',ns],['Clicaram em agendar',Object.keys(cl).length],['Enviaram o formulário',Object.keys(sb2).length],['Reuniões confirmadas',bk]];
  $('fun').innerHTML=steps.map(function(s,i){var pct=i?(steps[i-1][1]?Math.round(s[1]/steps[i-1][1]*100):0):100;
@@ -303,33 +320,60 @@ function render(){
  rows($('b-dev'),dev,ns);rows($('b-lang'),lang,ns);rows($('b-tz'),tz,ns);
  D.events.filter(function(e){return e.type==='click_book'}).forEach(function(e){var n2=BTN[e.label]||e.label||'n/d';mapB[n2]=(mapB[n2]||0)+1});
  rows($('b-btn'),mapB,nclk);
- renderLeads();renderBookings();
+ $('tcat').textContent='Catálogo'+(D.leads.filter(function(l){return isCat(l)&&l.status==='novo'}).length?' ('+D.leads.filter(function(l){return isCat(l)&&l.status==='novo'}).length+(D.leads.filter(function(l){return isCat(l)&&l.status==='novo'}).length===1?' novo)':' novos)'):'');
+ renderLeads();renderCat();renderBookings();
  ready=true;panes()}
 
 /* ---------- cadastros ---------- */
 function filtered(){
  var q=$('q').value.trim().toLowerCase(),fs=$('fs').value,fo=$('fo').value;
  return D.leads.filter(function(l){
-  if(fs&&l.status!==fs)return false;if(fo&&l.source!==fo)return false;
+  if(fs&&l.status!==fs)return false;if(fo==='catalogo'?!isCat(l):(fo&&(l.source!==fo||(fo==='contato'&&isCat(l)))))return false;
   if(q&&(l.name+' '+(l.email||'')+' '+(l.phone||'')).toLowerCase().indexOf(q)<0)return false;return true})}
 function renderLeads(){
  var a=filtered();
  $('lt').innerHTML=a.length?a.map(function(l){
   var ph=(l.phone||'').replace(/[^\d+]/g,'');
   var wa=ph.replace(/\D/g,'').length>=8?' <a href="https://wa.me/'+ph.replace(/\D/g,'')+'" target="_blank" rel="noopener" title="Abrir WhatsApp">WhatsApp</a>':'';
-  return '<tr><td style="white-space:nowrap">'+dtBR(l.created_at)+'</td><td><span class="pill">'+(l.source==='contato'?'Contato':'Agendamento')+'</span></td><td><b>'+esc(l.name)+'</b></td><td>'+esc(l.phone||'-')+wa+'</td><td>'+(l.email?'<a href="mailto:'+esc(l.email)+'">'+esc(l.email)+'</a>':'-')+'</td><td class="msg">'+esc(l.message||'')+'</td><td><select data-id="'+esc(l.id)+'" aria-label="Status de '+esc(l.name)+'">'+Object.keys(STAT).map(function(s){return '<option value="'+s+'"'+(l.status===s?' selected':'')+'>'+STAT[s]+'</option>'}).join('')+'</select></td></tr>'}).join(''):'<tr><td colspan="7" class="empty" style="padding:18px">Nenhum cadastro encontrado.</td></tr>';
- $('lt').querySelectorAll('select').forEach(function(s){s.addEventListener('change',function(){
+  return '<tr><td style="white-space:nowrap">'+dtBR(l.created_at)+'</td><td><span class="pill">'+(isCat(l)?'Catálogo':l.source==='contato'?'Contato':'Agendamento')+'</span></td><td><b>'+esc(l.name)+'</b></td><td>'+esc(l.phone||'-')+wa+'</td><td>'+(l.email?'<a href="mailto:'+esc(l.email)+'">'+esc(l.email)+'</a>':'-')+'</td><td class="msg">'+esc(l.message||'')+'</td><td><select data-id="'+esc(l.id)+'" aria-label="Status de '+esc(l.name)+'">'+Object.keys(STAT).map(function(s){return '<option value="'+s+'"'+(l.status===s?' selected':'')+'>'+STAT[s]+'</option>'}).join('')+'</select></td></tr>'}).join(''):'<tr><td colspan="7" class="empty" style="padding:18px">Nenhum cadastro encontrado.</td></tr>';
+ bindSt($('lt'));}
+function bindSt(box){  box.querySelectorAll('select').forEach(function(s){s.addEventListener('change',function(){
   var id=s.dataset.id,v=s.value;s.disabled=true;
   sb.from('leads').update({status:v}).eq('id',id).then(function(r){s.disabled=false;
    if(r.error){alert('Não foi possível salvar o status.');return}
    D.leads.forEach(function(l){if(l.id===id)l.status=v});render()})})})}
+
 ['q','fs','fo'].forEach(function(i){$(i).addEventListener('input',renderLeads)});
 $('csv').addEventListener('click',function(){
  var a=filtered(),h=['Data','Origem','Nome','Telefone','E-mail','Mensagem','Status','Idioma'];
  function c(v){v=String(v==null?'':v);if(/^[=+\-@]/.test(v))v="'"+v;return '"'+v.replace(/"/g,'""')+'"'}
- var t=[h.map(c).join(';')].concat(a.map(function(l){return [dtBR(l.created_at),l.source,l.name,l.phone,l.email,l.message,STAT[l.status]||l.status,l.lang].map(c).join(';')})).join('\r\n');
+ var t=[h.map(c).join(';')].concat(a.map(function(l){return [dtBR(l.created_at),(isCat(l)?'catalogo':l.source),l.name,l.phone,l.email,l.message,STAT[l.status]||l.status,l.lang].map(c).join(';')})).join('\r\n');
  var u=URL.createObjectURL(new Blob(['﻿'+t],{type:'text/csv;charset=utf-8'}));
  var l=document.createElement('a');l.href=u;l.download='cadastros-pyoneer.csv';document.body.appendChild(l);l.click();l.remove();setTimeout(function(){URL.revokeObjectURL(u)},2000)});
+
+/* ---------- catálogo ---------- */
+function catList(){
+ var q=$('cq').value.trim().toLowerCase(),fs=$('cs').value;
+ return D.leads.filter(isCat).filter(function(l){
+  if(fs&&l.status!==fs)return false;
+  if(q&&(l.name+' '+(l.email||'')+' '+(l.phone||'')).toLowerCase().indexOf(q)<0)return false;return true})}
+function renderCat(){
+ var all1=D.leads.filter(isCat),a=catList(),today=dKey(new Date().toISOString());
+ var nHoje=all1.filter(function(l){return dKey(l.created_at)===today}).length,nNovo=all1.filter(function(l){return l.status==='novo'}).length;
+ var ns={};D.visits.forEach(function(v){ns[v.sid]=1});var nsn=Object.keys(ns).length;
+ $('ck').innerHTML='<div class="kpi"><div class="n">'+fmtN(all1.length)+'</div><div class="l">Downloads no período</div></div><div class="kpi"><div class="n">'+fmtN(nHoje)+'</div><div class="l">Hoje</div></div><div class="kpi"><div class="n">'+(nsn?(all1.length/nsn*100).toFixed(1).replace('.',','):'0')+'%</div><div class="l">Sessões que baixam</div></div><div class="kpi dark"><div class="n">'+fmtN(nNovo)+'</div><div class="l">Ainda não contatados</div></div>';
+ $('ct').innerHTML=a.length?a.map(function(l){
+  var ph=(l.phone||'').replace(/[^\d+]/g,'');
+  var wa=ph.replace(/\D/g,'').length>=8?' <a href="https://wa.me/'+ph.replace(/\D/g,'')+'" target="_blank" rel="noopener" title="Abrir WhatsApp">WhatsApp</a>':'';
+  return '<tr><td style="white-space:nowrap">'+dtBR(l.created_at)+'</td><td><b>'+esc(l.name)+'</b></td><td>'+esc(l.phone||'-')+wa+'</td><td>'+(l.email?'<a href="mailto:'+esc(l.email)+'">'+esc(l.email)+'</a>':'-')+'</td><td>'+esc((l.lang||'-').toUpperCase())+'</td><td><select data-id="'+esc(l.id)+'" aria-label="Status de '+esc(l.name)+'">'+Object.keys(STAT).map(function(s){return '<option value="'+s+'"'+(l.status===s?' selected':'')+'>'+STAT[s]+'</option>'}).join('')+'</select></td></tr>'}).join(''):'<tr><td colspan="6" class="empty" style="padding:18px">Nenhum download encontrado neste período.</td></tr>';
+ bindSt($('ct'))}
+['cq','cs'].forEach(function(i){$(i).addEventListener('input',renderCat)});
+$('ccsv').addEventListener('click',function(){
+ var a=catList(),h=['Data do download','Nome','Telefone','E-mail','Idioma','Status'];
+ function c(v){v=String(v==null?'':v);if(/^[=+\-@]/.test(v))v="'"+v;return '"'+v.replace(/"/g,'""')+'"'}
+ var t=[h.map(c).join(';')].concat(a.map(function(l){return [dtBR(l.created_at),l.name,l.phone,l.email,l.lang,STAT[l.status]||l.status].map(c).join(';')})).join('\r\n');
+ var u=URL.createObjectURL(new Blob(['\ufeff'+t],{type:'text/csv;charset=utf-8'}));
+ var l=document.createElement('a');l.href=u;l.download='catalogo-downloads-pyoneer.csv';document.body.appendChild(l);l.click();l.remove();setTimeout(function(){URL.revokeObjectURL(u)},2000)});
 
 /* ---------- agendamentos ---------- */
 function renderBookings(){
